@@ -8,7 +8,7 @@ using CSBI.Interfaces;
 
 namespace CSBI
 {
-    public class AppContext:DbContext, IAppContext
+    public class AppContext:DbContext
     {
         public AppContext(DbContextOptions<AppContext> options) : base(options) 
         {
@@ -17,15 +17,5 @@ namespace CSBI
 
         public DbSet<User> Users { get; set; }
         public DbSet<SuccessAuthorize> SuccessAuthorizes { get; set; }
-
-        public int SaveChanges()
-        {
-            return base.SaveChanges();
-        }
-
-        public async Task<int> SaveChangesAsync()
-        {
-            return await base.SaveChangesAsync();
-        }
     }
 }

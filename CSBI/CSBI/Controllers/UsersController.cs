@@ -17,13 +17,13 @@ namespace CSBI.Controllers
     [ApiController]
     public class UsersController : Controller
     {
-        IAppContext _db;
-        IUserService _userService;
+        IUserRepository userRepo;
+        IUserService userService;
 
-        public UsersController(IAppContext db, IUserService userService)
+        public UsersController(IUserRepository userRepo, IUserService userService)
         {
-            _db = db;
-            _userService = userService;
+            this.userRepo = userRepo;
+            this.userService = userService;
         }
 
         [AllowAnonymous]
@@ -31,18 +31,18 @@ namespace CSBI.Controllers
         [Route("registration")]
         public ActionResult RegisterUser([FromBody] Credentials newUser)
         {
-            if (!_userService.CheckUserCredential(newUser))
+            if (!userService.CheckUserCredential(newUser))
                 return BadRequest("User credential is wrong!");
 
-            var existUser = _db.Users.FirstOrDefault(x => x.Login == newUser.Login);
+            var existUser = userRepo.GetByName(newUser.Login);
 
             if (existUser != null)
                 return BadRequest("User already exist!");
 
             var userToAdd = new User() { Login = newUser.Login, Password = newUser.Password };
 
-            _db.Users.Add(userToAdd);
-            _db.SaveChanges();
+            userRepo.Create(userToAdd);
+            userRepo.SaveChanges();
 
             return Ok();
         }
@@ -52,10 +52,10 @@ namespace CSBI.Controllers
         [Route("authorization")]
         public ActionResult<string> AuthorizeUser([FromBody] Credentials userToAuth)
         {
-            if (!_userService.CheckUserCredential(userToAuth))
+            if (!userService.CheckUserCredential(userToAuth))
                 return BadRequest("User credential is wrong!");
 
-            var existUser = _db.Users.FirstOrDefault(x => x.Login == userToAuth.Login);
+            var existUser = userRepo.GetByName(userToAuth.Login);
 
             if (existUser == null)
                 return NotFound("User doesn't exist!");
@@ -63,7 +63,7 @@ namespace CSBI.Controllers
             if(existUser.Password!= userToAuth.Password)
                 return BadRequest("Password incorrect!");
 
-            string token=_userService.GenerateJwtToken(existUser.Id);
+            string token= userService.GenerateJwtToken(existUser.Id);
 
             existUser.SuccessAuthorizes.Add(new SuccessAuthorize()
             {
@@ -71,7 +71,8 @@ namespace CSBI.Controllers
                 IP = HttpContext.Connection.RemoteIpAddress.ToString()
             });
 
-            _db.SaveChanges();
+            userRepo.Update(existUser);
+            userRepo.SaveChanges();
             return token;
         }
 
@@ -81,10 +82,13 @@ namespace CSBI.Controllers
         {
             var claimsIdentity = User.Identity as ClaimsIdentity;
             var userId = Guid.Parse(claimsIdentity.FindFirst("Id").Value);
-            var user = _db.Users.Include(x => x.SuccessAuthorizes).FirstOrDefault(x => x.Id == userId);
+            var user = userRepo.GetByIdWithAuthor(userId);
 
             if (user == null)
                 return NotFound("User doesn't exist!");
+
+            if (user.SuccessAuthorizes.Count == 0)
+                return NotFound("Authorizes for user not found!");
 
             return user.SuccessAuthorizes;
         }
@@ -93,12 +97,15 @@ namespace CSBI.Controllers
         [Route("{id}/authorization/list")]
         public ActionResult<List<SuccessAuthorize>> GetAuthorListById(Guid id)
         {
-            var authorizes = _db.SuccessAuthorizes.Where(x => x.User.Id == id).ToList();
-            
-            if (authorizes.Count==0)
+            var user = userRepo.GetByIdWithAuthor(id);
+
+            if (user == null)
+                return NotFound("User doesn't exist!");
+
+            if (user.SuccessAuthorizes.Count == 0)
                 return NotFound("Authorizes for user not found!");
 
-            return authorizes;
+            return user.SuccessAuthorizes;
         }
     }
 }

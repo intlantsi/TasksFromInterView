@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Net;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Http;
 using Xunit;
@@ -10,6 +9,7 @@ using CSBI.Services;
 using CSBI.Interfaces;
 using CSBI.Models;
 using CSBI.Controllers;
+using CSBI.Tests.Mocks;
 
 namespace CSBI.Tests.Controllers.UserController
 {
@@ -17,29 +17,24 @@ namespace CSBI.Tests.Controllers.UserController
     {
         IConfiguration config;
         IUserService userService;
-        IAppContext context;
+        IUserRepository userRepo;
 
         public AuthorizeUserTests()
         {
             var myConfiguration = new Dictionary<string, string> { { "Token:Key", "SuperSecretTestKey" } };
-            config = new ConfigurationBuilder()
-                .AddInMemoryCollection(myConfiguration)
-                .Build();
+            config = new ConfigurationBuilder().AddInMemoryCollection(myConfiguration).Build();
             userService = new UserService(config);
 
-            var options = new DbContextOptionsBuilder<AppContext>()
-                    .UseInMemoryDatabase(databaseName: "CSBIDB")
-                    .Options;
-            context = new AppContext(options);
-            context.Users.Add(new User() { Id = Guid.NewGuid(), Login = "Login", Password = "Password" });
-            context.SaveChanges();
+            userRepo = new MockUserRepo();
+            userRepo.Create(new User() { Id = Guid.NewGuid(), Login = "Login", Password = "Password" });
+            userRepo.SaveChanges();
         }
 
         [Fact]
         public void AuthorizeUser_Succesfull_Ok()
         {
             //Arrange
-            UsersController cntrl = new UsersController(context, userService);
+            UsersController cntrl = new UsersController(userRepo, userService);
             cntrl.ControllerContext.HttpContext = new DefaultHttpContext();
             cntrl.ControllerContext.HttpContext.Connection.RemoteIpAddress = IPAddress.Parse("127.0.0.1");
 
@@ -54,7 +49,7 @@ namespace CSBI.Tests.Controllers.UserController
         public void AuthorizeUser_UserIsNull_BadRequest()
         {
             //Arrange
-            UsersController cntrl = new UsersController(context, userService);
+            UsersController cntrl = new UsersController(userRepo, userService);
 
             //Act
             var response = cntrl.AuthorizeUser(null);
@@ -67,7 +62,7 @@ namespace CSBI.Tests.Controllers.UserController
         public void AuthorizeUser_LoginOrPasswordIsNull_BadRequest()
         {
             //Arrange
-            UsersController cntrl = new UsersController(context, userService);
+            UsersController cntrl = new UsersController(userRepo, userService);
 
             //Act
             var response = cntrl.AuthorizeUser(new Credentials { Login = null, Password = null });
@@ -80,7 +75,7 @@ namespace CSBI.Tests.Controllers.UserController
         public void AuthorizeUser_UserNotExist_NotFound()
         {
             //Arrange
-            UsersController cntrl = new UsersController(context, userService);
+            UsersController cntrl = new UsersController(userRepo, userService);
 
             //Act
             var response = cntrl.AuthorizeUser(new Credentials { Login = "Login12", Password = "Password" });
@@ -93,7 +88,7 @@ namespace CSBI.Tests.Controllers.UserController
         public void AuthorizeUser_PswdIncorrect_BadRequest()
         {
             //Arrange
-            UsersController cntrl = new UsersController(context, userService);
+            UsersController cntrl = new UsersController(userRepo, userService);
 
             //Act
             var response = cntrl.AuthorizeUser(new Credentials { Login = "Login", Password = "111111111" });

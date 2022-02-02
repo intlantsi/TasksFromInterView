@@ -1,13 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Xunit;
 using CSBI.Services;
 using CSBI.Interfaces;
 using CSBI.Models;
 using CSBI.Controllers;
+using CSBI.Tests.Mocks;
 
 namespace CSBI.Tests.Controllers.UserController
 {
@@ -15,27 +15,21 @@ namespace CSBI.Tests.Controllers.UserController
     {
         IConfiguration config;
         IUserService userService;
-        IAppContext context;
+        IUserRepository userRepo;
 
         public GetAuthorListByIdTests()
         {
             var myConfiguration = new Dictionary<string, string> { { "Token:Key", "SuperSecretTestKey" } };
-            config = new ConfigurationBuilder()
-                .AddInMemoryCollection(myConfiguration)
-                .Build();
+            config = new ConfigurationBuilder().AddInMemoryCollection(myConfiguration).Build();
             userService = new UserService(config);
-
-            var options = new DbContextOptionsBuilder<AppContext>()
-                    .UseInMemoryDatabase(databaseName: "CSBIDB")
-                    .Options;
-            context = new AppContext(options);
+            userRepo = new MockUserRepo();
         }
 
         [Fact]
         public void GetAuthorListById_UserNotExist_NotFound()
         {
             //Arrange
-            UsersController cntrl = new UsersController(context, userService);
+            UsersController cntrl = new UsersController(userRepo, userService);
 
             //Act
             var response = cntrl.GetAuthorListById(Guid.Empty);
@@ -55,9 +49,9 @@ namespace CSBI.Tests.Controllers.UserController
                 Password = "Password",
             };
             user.SuccessAuthorizes.Add(new SuccessAuthorize { Id = 1, IP = "127.0.0.1", AuthorizeTime = DateTime.Now });
-            context.Users.Add(user);
-            context.SaveChanges();
-            UsersController cntrl = new UsersController(context, userService);
+            userRepo.Create(user);
+            userRepo.SaveChanges();
+            UsersController cntrl = new UsersController(userRepo, userService);
 
 
             //Act

@@ -1,13 +1,13 @@
 using System;
 using System.Collections.Generic;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Xunit;
 using CSBI.Services;
 using CSBI.Interfaces;
 using CSBI.Models;
 using CSBI.Controllers;
+using CSBI.Tests.Mocks;
 
 namespace CSBI.Tests.Controllers.UserController
 {
@@ -15,33 +15,26 @@ namespace CSBI.Tests.Controllers.UserController
     {
         IConfiguration config;
         IUserService userService;
-        IAppContext context;
+        IUserRepository userRepo;
 
         public RegisterUserTests()
         {
             var myConfiguration = new Dictionary<string, string> { { "Token:Key", "SuperSecretTestKey" } };
-            config = new ConfigurationBuilder()
-                .AddInMemoryCollection(myConfiguration)
-                .Build();
+            config = new ConfigurationBuilder().AddInMemoryCollection(myConfiguration).Build();
             userService = new UserService(config);
-
-            var options = new DbContextOptionsBuilder<AppContext>()
-                    .UseInMemoryDatabase(databaseName: "CSBIDB")
-                    .Options;
-            context = new AppContext(options);
+            userRepo = new MockUserRepo();
         }
 
         [Fact]
         public void RegisterUser_Succesfull()
         {
             //Arrange
-            UsersController _cntrl = new UsersController(context, userService);
+            UsersController _cntrl = new UsersController(userRepo, userService);
 
             //Act
 			var response=_cntrl.RegisterUser(new Credentials { Login = "LoginNew", Password = "PasswordNew" });
 
             //Assert
-            Assert.NotEmpty(context.Users);
             Assert.IsType<OkResult>(response);
         }
 		
@@ -49,7 +42,7 @@ namespace CSBI.Tests.Controllers.UserController
         public void RegisterUser_UserIsNull()
         {
             //Arrange
-            UsersController _cntrl = new UsersController(context, userService);
+            UsersController _cntrl = new UsersController(userRepo, userService);
 
             //Act
             var response=_cntrl.RegisterUser(null);
@@ -62,7 +55,7 @@ namespace CSBI.Tests.Controllers.UserController
         public void RegisterUser_LoginOrPasswordIsNull_BadRequest()
         {
             //Arrange
-            UsersController _cntrl = new UsersController(context, userService);
+            UsersController _cntrl = new UsersController(userRepo, userService);
 
             //Act
             var response=_cntrl.RegisterUser(new Credentials { Login = null, Password = null });
@@ -75,8 +68,8 @@ namespace CSBI.Tests.Controllers.UserController
         public void RegisterUser_UserAlreadyExist()
         {
             //Arrange
-            context.Users.Add(new User() { Id = Guid.NewGuid(), Login = "Login", Password = "Password" });
-            UsersController _cntrl = new UsersController(context, userService);
+            userRepo.Create(new User() { Id = Guid.NewGuid(), Login = "Login", Password = "Password" });
+            UsersController _cntrl = new UsersController(userRepo, userService);
 
             //Act
 			var response=_cntrl.RegisterUser(new Credentials { Login = "Login", Password = "Password" });

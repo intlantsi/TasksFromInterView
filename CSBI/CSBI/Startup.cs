@@ -72,10 +72,8 @@ namespace CSBI
                 });
             });
 
-            services.AddEntityFrameworkSqlServer()
-                .AddDbContext<AppContext>(options =>
-                   options.UseSqlServer(Configuration.GetConnectionString("DefaultConnection")));
-            services.AddScoped<IAppContext>(provider => provider.GetService<AppContext>());
+            services.AddDbContext<AppContext>(options=>options.UseSqlite(Configuration.GetConnectionString("DefaultConnection")));
+            services.AddScoped<IUserRepository, EFUserRepository>();
             services.AddScoped<IUserService, UserService>();
         }
 
